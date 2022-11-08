@@ -5,6 +5,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth; 
 use Log;
+use Validator;
 
 class PassportAuthController extends Controller
 {
@@ -13,13 +14,30 @@ class PassportAuthController extends Controller
          * handle user registration request
          */
         public function registerUser(Request $request){
-           
-            $this->validate($request,[
-                'name'=>'required',
-                'email'=>'required|email|unique:users',
-                'password'=>'required|min:8',
-            ]);
-             
+            $rules = [
+                'name'=>'required|min:4|max:250',
+                'email'=>'required|email|unique:users|max:250',
+                'password'=>'required|min:8|max:16',
+            ];
+            $message = [
+                'name.required' => 'Name is required',
+                'name.min' => 'Name should be 4 letter or greater',
+                'name.max' => 'Name can have maximum 250 character',
+                'email.required' => 'Email is required',
+                'email.email' => 'Email should be valid',
+                'email.unique' => 'Email should be unique',
+                'email.max' => 'Email can have maximum 250 character',
+                'password.required' => 'Password is required',
+                'password.min' => 'Password should be 8 or more character',
+                'password.max' => 'Password can have maximum 250 character',
+            ];
+            $validator = Validator::make($request->all(),$rules,$message);
+            if ($validator->fails()) {
+                return response()->json([
+                  'errors' => $validator->errors(),
+                  'status' => 400]
+                );
+            } 
             $user= User::create([
                 'name' =>$request->name,
                 'email'=>$request->email,
@@ -57,15 +75,25 @@ class PassportAuthController extends Controller
             try{
                 $user = Auth::user();
                 $userId = $user->id;
-                $this->validate($req,[
+                $rules = [
                     'amount'=>'required|numeric|min:3|max:100',
-                ]);
-                $user = User::where('id', $userId)->first();
-                $user->wallet = $req->amount + $user->wallet;
-                $user->wallet = number_format((float)$user->wallet, 2, '.', '');
-                if($user->save()){
-                    return response()->json(['type'=>'success','msg'=>'Amount Add Succesfully']);
-                }
+                ];
+                $message = [
+                    'amount.required' => 'Amount is required',
+                    'amount.min' => 'Amount should be greater or equal to 3',
+                    'amount.max' => 'Amount can not be more than 100',
+                    'amount.numeric'=> 'Amount should be numeric'
+                ];
+                $validator = Validator::make($req->all(),$rules,$message);
+                if ($validator->fails()) {
+                    return response()->json([
+                      'errors' => $validator->errors(),
+                      'status' => 400]
+                    );
+                } 
+                $user = User::where('id', $userId)->increment('wallet',$req->amount);
+                return response()->json(['type'=>'success','msg'=>'Amount Add Succesfully']);
+                
             } catch (\Exception $e) {
                 Log::error($e->getMessage());
                 return  response()->json(['type'=>'error','msg'=>$e->getMessage()],400);;
